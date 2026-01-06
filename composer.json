@@ -1,0 +1,26 @@
+{
+    "name": "franpass87/fp-hosting-cleaner",
+    "description": "Plugin WordPress per pulire file ridondanti e ottimizzare lo spazio hosting",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "version": "1.0.0",
+    "authors": [
+        {
+            "name": "Francesco Passeri",
+            "email": "info@francescopasseri.com",
+            "homepage": "https://www.francescopasseri.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "FP\\HostingCleaner\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

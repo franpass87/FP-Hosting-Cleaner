@@ -23,9 +23,16 @@ jQuery(document).ready(function($) {
                     $results.html('<div class="notice notice-error"><p>' + (response.data.message || fpHostingCleaner.strings.error) + '</p></div>').show();
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 $button.prop('disabled', false).text('Avvia Scansione');
-                $results.html('<div class="notice notice-error"><p>' + fpHostingCleaner.strings.error + '</p></div>').show();
+                var errorMsg = fpHostingCleaner.strings.error;
+                if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+                    errorMsg = xhr.responseJSON.data.message;
+                } else if (error) {
+                    errorMsg += ' (' + error + ')';
+                }
+                $results.html('<div class="notice notice-error"><p><strong>Errore:</strong> ' + errorMsg + '</p><p><small>Controlla la console del browser (F12) per dettagli.</small></p></div>').show();
+                console.error('FP Hosting Cleaner AJAX Error:', {xhr: xhr, status: status, error: error});
             }
         });
     });

@@ -221,21 +221,54 @@ class Admin {
      * AJAX: Scansione
      */
     public function ajax_scan() {
-        check_ajax_referer('fp_hosting_cleaner_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Permessi insufficienti.', 'fp-hosting-cleaner')));
+        try {
+            check_ajax_referer('fp_hosting_cleaner_nonce', 'nonce');
+            
+            if (!current_user_can('manage_options')) {
+                wp_send_json_error(array('message' => __('Permessi insufficienti.', 'fp-hosting-cleaner')));
+                return;
+            }
+            
+            // Esegui scansione in background (può richiedere tempo)
+            @set_time_limit(300); // 5 minuti
+            @ini_set('memory_limit', '512M');
+            
+            // Esegui scansione con gestione errori
+            try {
+                $results = $this->scanner->scan();
+            } catch (Exception $e) {
+                error_log('[FP-HOSTING-CLEANER] Errore durante scansione: ' . $e->getMessage());
+                wp_send_json_error(array(
+                    'message' => __('Errore durante la scansione: ', 'fp-hosting-cleaner') . $e->getMessage()
+                ));
+                return;
+            }
+            
+            // Verifica che i risultati siano validi
+            if (!is_array($results)) {
+                wp_send_json_error(array('message' => __('Risultati scansione non validi.', 'fp-hosting-cleaner')));
+                return;
+            }
+            
+            // Formatta i risultati per la visualizzazione
+            try {
+                $formatted = $this->format_scan_results($results);
+            } catch (Exception $e) {
+                error_log('[FP-HOSTING-CLEANER] Errore durante formattazione risultati: ' . $e->getMessage());
+                wp_send_json_error(array(
+                    'message' => __('Errore durante la formattazione dei risultati.', 'fp-hosting-cleaner')
+                ));
+                return;
+            }
+            
+            wp_send_json_success($formatted);
+            
+        } catch (Exception $e) {
+            error_log('[FP-HOSTING-CLEANER] Errore fatale AJAX scan: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => __('Errore fatale: ', 'fp-hosting-cleaner') . $e->getMessage()
+            ));
         }
-        
-        // Esegui scansione in background (può richiedere tempo)
-        set_time_limit(300); // 5 minuti
-        
-        $results = $this->scanner->scan();
-        
-        // Formatta i risultati per la visualizzazione
-        $formatted = $this->format_scan_results($results);
-        
-        wp_send_json_success($formatted);
     }
     
     /**
@@ -321,6 +354,7 @@ class Admin {
             'cache_files' => __('File Cache', 'fp-hosting-cleaner'),
             'backup_files' => __('File Backup', 'fp-hosting-cleaner'),
             'old_files' => __('File Vecchi', 'fp-hosting-cleaner'),
+            'uncategorized' => __('Altri File Vecchi', 'fp-hosting-cleaner'),
             'empty_dirs' => __('Directory Vuote', 'fp-hosting-cleaner'),
         );
         
@@ -334,14 +368,22 @@ class Admin {
                     $total_size += isset($dup['total_size']) ? $dup['total_size'] : 0;
                 }
             } else {
-                $total_size = array_sum(array_column($items, 'size'));
+                $total_size = 0;
+                if (is_array($items) && !empty($items)) {
+                    foreach ($items as $item) {
+                        if (isset($item['size'])) {
+                            $total_size += $item['size'];
+                        }
+                    }
+                }
             }
             
+            // Mostra sempre la categoria anche se vuota (per debug)
             $formatted['categories'][$key] = array(
                 'label' => $label,
                 'count' => $count,
                 'size' => $this->format_bytes($total_size),
-                'items' => array_slice($items, 0, 100), // Limita a 100 per performance
+                'items' => is_array($items) ? array_slice($items, 0, 100) : array(), // Limita a 100 per performance
             );
         }
         
